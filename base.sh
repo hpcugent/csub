@@ -24,8 +24,6 @@
 # along with csub. If not, see <http://www.gnu.org/licenses/>.
 #
 ##
-
-
 ##
 ## this is the basic script that does it all
 ## (no need for /bin/bash, is taken care of by BASEHEADER)
@@ -66,7 +64,7 @@ then
 	exit 1
 fi
 
-if [ ! -d $localdir ]
+if [ ! -d "$localdir" ]
 then
     ## no result from prologue -> shared checkpoint dir
     myecho "No localdir $localdir found (No local checkpoint)"
@@ -74,14 +72,14 @@ then
     localdir=$%(CSUB_SCRATCH)s/chkpt/$jobname
 
     # this directory should be created by csub
-    if [ ! -d $localdir ]
+    if [ ! -d "$localdir" ]
     then
     	## initial array job?
     	localdir_initial=$%(CSUB_SCRATCH)s/chkpt/$jobname_stripped
-    	if [ ! -f $localdir/%(chkptsubdir)s/chkpt.count ] && [ -d $localdir_initial ]
+    	if [ ! -f "$localdir/%(chkptsubdir)s/chkpt.count" ] && [ -d "$localdir_initial" ]
     	then
     		# copy initial job directory for array jobs
-    		cp -r $localdir_initial $localdir
+    		cp -r "$localdir_initial" "$localdir"
     	else
         	## problem
         	myecho "No localdir $localdir found (No shared checkpoint)"
@@ -90,11 +88,11 @@ then
     fi
 else
 	# copy script
-	cp $%(CSUB_SCRATCH)s/chkpt/$jobname/$scriptname $localdir
+	cp "$%(CSUB_SCRATCH)s/chkpt/$jobname/$scriptname" "$localdir"
 fi
 
 chkdir="$localdir/%(chkptsubdir)s"
-mkdir -p $chkdir/
+mkdir -p "$chkdir/"
 
 chkfile="$chkdir/chkpt.file"
 chktarb="$%(CSUB_SCRATCH)s/chkpt/$jobname/%(chkptsubdir)s/job.localdir.tarball"
@@ -113,10 +111,10 @@ export CSUB_KILL_ACK_FILE="$chkdir/script_killed_by_user"
 export CSUB_USER_CHKPT_SCRIPT="$chkdir/%(user_chkpt_script_file)s"
 
 chkfile_lastTime=0
-if [ -f $chkfile ]
+if [ -f "$chkfile" ]
 then
 	# double percent, based this script is pushed through Python
-	chkfile_lastTime=`stat -c %%Y $chkfile`
+	chkfile_lastTime=`stat -c %%Y "$chkfile"`
 fi
 
 jobout="$localdir/$jobname.out"
@@ -165,7 +163,7 @@ endjob () {
 mypid () {
 	# find match between pids of this job's children
 	# and pids of processes excuting the script
-    script_pids=`/sbin/pidof -x $scriptname`
+    script_pids=`/sbin/pidof -x "$scriptname"`
     if [ -z $job_pids_cached ]
     then
     	job_pids_cached=`pstree -p $$ | tr '\\\\n' ' ' | sed 's/[^0-9]*\\([0-9]\\+\\)[^0-9]*/\\\\1 /g'`
@@ -194,13 +192,13 @@ resubmit () {
     myexit=0
     ## resubmit this job (-N is required for array jobs!)
     ## the rest of this job should finish before all else
-    out=`module load jobs; qsub -N $jobname -q $%(CSUB_QUEUE)s -o $chkbaseout -e $chkbaseerr -W depend=afterok:$%(CSUB_JOBID)s < $chkdir/base`
+    out=`module load jobs; qsub -N $jobname -q $%(CSUB_QUEUE)s -o $chkbaseout -e $chkbaseerr -W depend=afterok:$%(CSUB_JOBID)s < "$chkdir/base"`
     if [ $? -gt 0 ]
     then
         myecho "Job resubmit failed."
         myecho "Job resubmit output): $out"
         sleep 5
-        out=`module load jobs; qsub -N $jobname -q $%(CSUB_QUEUE)s -o $chkbaseout -e $chkbaseerr -W depend=afterok:$%(CSUB_JOBID)s < $chkdir/base`
+        out=`module load jobs; qsub -N $jobname -q $%(CSUB_QUEUE)s -o $chkbaseout -e $chkbaseerr -W depend=afterok:$%(CSUB_JOBID)s < "$chkdir/base"`
         if [ $? -gt 0 ]
         then
             myecho "Job resubmit failed again."
@@ -239,7 +237,7 @@ restart () {
     ## sanity check
     for f in $chkid
     do
-      if [ ! -f $f ]
+      if [ ! -f "$f" ]
       then
 	  myecho "File $f missing"
 	  return 0
@@ -249,9 +247,9 @@ restart () {
     chkptid=`cat $chkid`
 
     ## failure retry
-    if [ -f $chkrecount ]
+    if [ -f "$chkrecount" ]
     then
-    	crcount=`cat $chkrecount`
+    	crcount=`cat "$chkrecount"`
     	if [ $crcount -gt $crcountmax ]
 	    then
 	       myecho "No more retries (max: $crcountmax). Giving up."
@@ -265,21 +263,21 @@ restart () {
     ## cr_restart
     ## wait until restart is really done
     ## nice trick from KennethHoste
-    rm -f $chkrestat
-    rm -f $chklock
-    lockfile $chklock
-    cr_restart $cr_restart_restore --run-on-success="echo OK > $chkrestat && rm -f $chklock" --run-on-failure="echo FAILURE > $chkrestat && rm -f $chklock" -f $chkfile >& $chkreout &
-    lockfile $chklock
-    rm -f $chklock
+    rm -f "$chkrestat"
+    rm -f "$chklock"
+    lockfile "$chklock"
+    cr_restart $cr_restart_restore --run-on-success="echo OK > \"$chkrestat\" && rm -f \"$chklock\"" --run-on-failure="echo FAILURE > \"$chkrestat\" && rm -f \"$chklock\"" -f "$chkfile" >& "$chkreout" &
+    lockfile "$chklock"
+    rm -f "$chklock"
 
     pid=`mypid`
 	echo $pid > $CSUB_MASTER_PID_FILE
 
     crstat='UNKNOWN'
-    if [ -f $chkrestat ]
+    if [ -f "$chkrestat" ]
     then
-        crstat=`cat $chkrestat`
-        rm -Rf $chkrestat
+        crstat=`cat "$chkrestat"`
+        rm -Rf "$chkrestat"
     else
         myecho "Restart status file $chkrestat not found. Is this a restart failure?"
         sleep 5
@@ -300,12 +298,12 @@ restart () {
 	OK)
 	    myecho "Succesful restart main id $chkptid restart nr $crcount at `hostname`"
 	    echo $chkptid > $chkid
-	    rm -f $chkrecount
+	    rm -f "$chkrecount"
 	    cleanup_after_restart=%(cleanup_after_restart)d
 	    if (( $cleanup_after_restart ))
 	    then
 	    	myecho "Cleaning up checkpoint and tarball after successful restart..."
-	    	rm $chkfile $chktarb
+	    	rm "$chkfile" "$chktarb"
 	    fi
 	    ;;
 	FAILURE)
@@ -362,18 +360,18 @@ firststart () {
 	echo $stcount > $startcount
 
     echo 0 > $chkid
-    if [ -f $chkprestage ]
+    if [ -f "$chkprestage" ]
     then
-	   $chkprestage
+	   "$chkprestage"
     fi
-    cr_run -- ./$scriptname > ${jobout} 2> ${joberr} &
+    cr_run -- "./$scriptname" > ${jobout} 2> ${joberr} &
     ## should be immediate
     ## i'm not sure what's fastest: starting in background or starting with cr_run
     sleep 5
     pid=`mypid`
     if [ $pid -gt 0 ]
     then
-    	echo $pid > $CSUB_MASTER_PID_FILE
+    	echo $pid > "$CSUB_MASTER_PID_FILE"
     else
     	echo "PID of process started with cr_run running $scriptname not found... Exiting!"
     	exit 1
@@ -407,18 +405,18 @@ makechkpt () {
     fun=makechkpt
     myecho
     myecho "begin $fun `date`"
-    # double percent, based this script is pushed through Python
-    if [ -f $chkfile ]
+    if [ -f "$chkfile" ]
     then
-    	chkfile_curTime=`stat -c %%Y $chkfile`
+        # double percent, based this script is pushed through Python
+    	chkfile_curTime=`stat -c %%Y "$chkfile"`
     else
     	chkfile_curTime=0
     fi
     myecho "chkfile_lastTime: $chkfile_lastTime; chkfile_curTime: $chkfile_curTime"
-    if [ -f $chkfile ] && [ $chkfile_curTime -gt $chkfile_lastTime ]
+    if [ -f "$chkfile" ] && [ $chkfile_curTime -gt $chkfile_lastTime ]
     then
     	myecho "Recent checkpoint found (time now: `date`):"
-    	ls -l $chkfile
+    	ls -l "$chkfile"
     	pid=`mypid`
     	if [ $pid -gt 0 ]
     	then
@@ -430,11 +428,11 @@ makechkpt () {
     	myecho "No recent checkpoint found, so checkpointing..."
     	if [ "x%(CSUB_KILL_MODE)s" == "xterm" ]
     	then
-    		cr_checkpoint --term --save-$chksave $pid -f $chkfile
+    		cr_checkpoint --term --save-$chksave $pid -f "$chkfile"
     		sleep 30
     		kill -9 $pid
     	else
-    		cr_checkpoint --kill --save-$chksave $pid -f $chkfile
+    		cr_checkpoint --kill --save-$chksave $pid -f "$chkfile"
     	fi
     fi
     myecho "end $fun `date`"
@@ -446,19 +444,19 @@ endofjob () {
     myecho
     myecho "begin $fun `date`"
     # Add stdout and stderr to central files
-    if [ -f $chkpoststage ]
+    if [ -f "$chkpoststage" ]
     then
-       cp -a $chkpoststage /tmp/poststage
+       cp -a "$chkpoststage" /tmp/poststage
        chmod +x /tmp/poststage
        if (( %(cleanup_chkpt)d ))
        then
-       		rm -Rf $chkdir
+       		rm -Rf "$chkdir"
        fi
        /tmp/poststage
     else
        if (( %(cleanup_chkpt)d ))
        then
-       		rm -Rf $chkdir
+       		rm -Rf "$chkdir"
        fi
     fi
     endjob
@@ -486,7 +484,7 @@ then
 	exit 30
 fi
 
-cd $localdir
+cd "$localdir"
 if [ $? -gt 0 ]
 then
     myecho "Can't cd into localdir $localdir"
@@ -498,7 +496,7 @@ rm -f job.complete
 
 
 
-if [ -f $chkfile ]
+if [ -f "$chkfile" ]
 then
     restart
 else
@@ -522,10 +520,10 @@ then
   resubmit # exits
 else
   # check if job was killed by user after checkpoint
-  if [ -f $CSUB_KILL_ACK_FILE ]
+  if [ -f "$CSUB_KILL_ACK_FILE" ]
   then
   	makechkpt
-  	rm $CSUB_KILL_ACK_FILE
+  	rm "$CSUB_KILL_ACK_FILE"
   	if [ $? -ne 0 ]
   	then
   		myecho "ERROR! Failed to remove file $CSUB_KILL_ACK_FILE. Not resubmitting after checkpoint."
@@ -544,6 +542,3 @@ epilogue
 myecho
 myecho "END base $%(CSUB_JOBID)s `date`"
 myecho
-
-
-
