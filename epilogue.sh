@@ -209,7 +209,7 @@ case $FLAVOUR in
             fi
         fi
 
-	   if [ -f $tarb ]
+	   if [ -f "$tarb" ]
        then
 	       unpack
 	   else
@@ -222,7 +222,7 @@ case $FLAVOUR in
             ## abnormal job end, eg qdel
             myecho "Job completed. But no normal job end. Removing all local files"
         else
-           mkdir -p $chkptdir/checkpoint
+           mkdir -p "$chkptdir/checkpoint"
            if [ $? -gt 0 ]
            then
                myecho "Creating chkptdir $chkptdir/checkpoint failed"
@@ -232,16 +232,16 @@ case $FLAVOUR in
     	   if [ ! -f "job.complete" ]
 	       then
 	           ## remove tarball ok file
-	           rm -f $tarb.ok
+	           rm -f "$tarb.ok"
 	           pack
                ## set tarball ok file
-	           touch $tarb.ok
+	           touch "$tarb.ok"
 	       else
 	           myecho "Job completed. No packing."
 	           if (( $cleanup_chkpt ))
 	           then
 		           myecho "Removing chkptdir $chkptdir"
-		           remove_dir $chkptdir
+		           remove_dir "$chkptdir"
 
             	   # last array job should try and remove initial job directory
                	   # this directory contains all info on checkpointing of different array jobs
@@ -249,14 +249,14 @@ case $FLAVOUR in
 	               chkptdir_initial=`echo $chkptdir | sed 's/-[0-9]\\+$//g'`
     	           dir=`dirname $chkptdir_initial`
         	       base=`basename $chkptdir_initial`
-            	   ls $dir | grep "^${base}-[0-9]\+$" >& /dev/null
+            	   ls "$dir" | grep "^${base}-[0-9]\+$" >& /dev/null
 	               if [ $? -ne 0 ]
     	           then
         	       		remove_dir ${chkptdir_initial}
             	   fi
                else
                		# 	copy back stdout/stderr of job into chkpt subdir (useful for debugging)
-               		cp $localdir/${jobname}.out $localdir/${jobname}.err $chkptdir
+               		cp "$localdir/${jobname}.out" "$localdir/${jobname}.err" "$chkptdir"
                fi
 	       fi
 	   fi
@@ -265,9 +265,6 @@ case $FLAVOUR in
 	   ;;
 esac
 
-cd $CURRENTDIR 2> /dev/null
+cd "$CURRENTDIR" 2> /dev/null
 
 endd
-
-
-
