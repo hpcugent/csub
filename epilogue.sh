@@ -1,6 +1,6 @@
 #!/bin/bash
 ##
-# Copyright 2009-2014 Ghent University
+# Copyright 2009-2015 Ghent University
 #
 # This file is part of csub,
 # originally created by the HPC team of Ghent University (http://ugent.be/hpc/en),
@@ -120,8 +120,8 @@ unpack () {
 remove_dir () {
 	dir=$1
 	# this doesn't work on NFS, because (base script)job stdout and stderr are there
-    # files are still open when rm is called, and NFS doesn't allow removal of open files
-    rm -Rf $dir
+	# files are still open when rm is called, and NFS doesn't allow removal of open files
+	rm -Rf $dir
 	exit_code=$?
 	if [ $exit_code -gt 0 ]
 	then
