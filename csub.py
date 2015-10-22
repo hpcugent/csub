@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 ##
-# Copyright 2009-2014 Ghent University
+# Copyright 2009-2015 Ghent University
 #
 # This file is part of csub,
 # originally created by the HPC team of Ghent University (http://ugent.be/hpc/en),
@@ -24,7 +24,7 @@
 # You should have received a copy of the GNU General Public License
 # along with csub. If not, see <http://www.gnu.org/licenses/>.
 #
-##
+#
 """
 This is a python wrapper for checkpointed job submission
 It is also a selfcontained jobscript
@@ -33,7 +33,7 @@ Requires torque >= 2.4.2 and BLCR
 @author: Stijn De Weirdt (Ghent University)
 @author: Kenneth Hoste (Ghent University)
 @author: Jens Timmerman (Ghent University)
-
+@author: Ward Poelmans (Ghent University)
 """
 
 import os
@@ -53,22 +53,22 @@ import sys
 #             * split_unique_script_name
 
 csub_vars_map = {
-    'CSUB_SCRATCH': 'VSC_SCRATCH',
-    'CSUB_SCRATCH_NODE': 'VSC_SCRATCH_NODE',
+    'CSUB_ARRAY_SEP': '-',  # array seperator, e.g. the '-' in job_name-1 (PBS)
+    'CSUB_JOBID': 'PBS_JOBID',
+    'CSUB_JOBNAME': 'PBS_JOBNAME',
+    'CSUB_KILL_MODE': 'kill',
+    'CSUB_O_HOST': 'PBS_O_HOST',
     'CSUB_ORG': 'VSC',
     'CSUB_PROFILE_SCRIPT': '/etc/profile.d/vsc.sh',
-    'CSUB_SCHEDULER': 'PBS',
-    'CSUB_ARRAY_SEP': '-',  # array seperator, e.g. the '-' in job_name-1 (PBS)
-    'CSUB_JOBNAME': 'PBS_JOBNAME',
-    'CSUB_O_HOST': 'PBS_O_HOST',
-    'CSUB_JOBID': 'PBS_JOBID',
-    'CSUB_SERVER': 'PBS_SERVER',
-    'CSUB_KILL_MODE': 'kill',
     'CSUB_QUEUE': 'PBS_QUEUE',
+    'CSUB_SCHEDULER': 'PBS',
+    'CSUB_SCRATCH_NODE': 'VSC_SCRATCH_NODE',
+    'CSUB_SCRATCH': 'VSC_SCRATCH',
+    'CSUB_SERVER': 'PBS_SERVER',
 }
 
 
-### These are filled with the makecsub.py script
+# These are filled with the makecsub.py script
 EPILOGUE = ""
 BASE = ""
 
@@ -87,7 +87,7 @@ then
   fi
 else
     echo "Sourcedir $srcdir not found"
-    exit 1
+    exit 2
 fi
 
 """
@@ -111,7 +111,7 @@ then
   rm -f $destdir/prologue $destdir/epilogue
 else
     echo "Destdir $destdir not found"
-    exit 1
+    exit 2
 fi
 
 """
@@ -169,13 +169,11 @@ def usage():
 def get_job_name_spec(script):
 
     if csub_vars_map['CSUB_SCHEDULER'] == "PBS":
-        regname = re.compile("^\s*#PBS\s+-N\s+(?P<job_name>\S+)\s*$",
-                             re.MULTILINE).search(script)
+        regname = re.compile("^\s*#PBS\s+-N\s+(?P<job_name>\S+)\s*$", re.MULTILINE).search(script)
         if regname:
             return regname.group('job_name')
         else:
             return None
-        return regname.group('job_name')
 
     else:
         print "(get_job_name_spec) Don't know how to handle %s as a job scheduler, sorry."
@@ -185,10 +183,8 @@ def get_job_name_spec(script):
 def get_wall_time(script):
     if csub_vars_map['CSUB_SCHEDULER'] == "PBS":
         walltime_regexp = re.compile("^(#PBS -l walltime)=(?P<walltime>[0-9:]+)\s*(\S*)$", re.MULTILINE)
-        walltime_list = [int(x) for x in walltime_regexp.search(
-            basetxt).group('walltime').split(':')]
-        walltime = walltime_list[0] * 3600 + walltime_list[1] * \
-            60 + walltime_list[2]
+        walltime_list = [int(x) for x in walltime_regexp.search(script).group('walltime').split(':')]
+        walltime = walltime_list[0] * 3600 + walltime_list[1] * 60 + walltime_list[2]
         return walltime
     else:
         print "(get_wall_time) Don't know how to handle %s as a job scheduler, sorry."
@@ -206,8 +202,7 @@ def replace_walltime_str(script, wall_time_str):
 
 def replace_vmem(script, vmem):
     if csub_vars_map['CSUB_SCHEDULER'] == "PBS":
-        vmem_regexp = re.compile(
-            "^(#PBS -l vmem)=(?P<vmem>.+)\s*(\S*)$", re.MULTILINE)
+        vmem_regexp = re.compile("^(#PBS -l vmem)=(?P<vmem>.+)\s*(\S*)$", re.MULTILINE)
         return vmem_regexp.sub(r"\1=%s \3" % vmem, script)
     else:
         print "(replace_vmem) Don't know how to handle %s as a job scheduler, sorry."
@@ -232,11 +227,10 @@ def gen_pro_epi_spec(pro_epi, pro_epi_script):
 def gen_wall_time_str(wall_time):
 
     if csub_vars_map['CSUB_SCHEDULER'] == "PBS":
-        wall_time_hours = wall_time / 3600
-        wall_time_mins = wall_time % 3600 / 60
-        wall_time_secs = wall_time % 3600 % 60
-        wall_time_str = "%d:%d:%d" % (
-            wall_time_hours, wall_time_mins, wall_time_secs)
+        wall_time_hours = int(wall_time / 3600)
+        wall_time_mins = int(wall_time % 3600 / 60)
+        wall_time_secs = int(wall_time % 3600 % 60)
+        wall_time_str = "%d:%d:%d" % (wall_time_hours, wall_time_mins, wall_time_secs)
         return wall_time_str
     else:
         print "(gen_wall_time_str) Don't know how to handle %s as a job scheduler, sorry."
@@ -249,17 +243,17 @@ def gen_base_header(localmap, script):
 
     req_keys = ['queue', 'wall_time', 'name', 'chkptdirbase',
                 'prologue_header_spec', 'epilogue_header_spec']
-    if False in [(k in localmap.keys()) for k in req_keys]:
+
+    if any([(k not in localmap.keys()) for k in req_keys]):
         print """(gen_base_header) Not all required keys found in localmap (%s),
-things will probably go wrong...""" % ','.join(req_keys)
+                 things will probably go wrong...""" % ','.join(req_keys)
 
     if csub_vars_map['CSUB_SCHEDULER'] == "PBS":
 
         vmemregexp = re.compile("^\s*#PBS\s+-l\s+vmem")
 
         l_specs = ""
-        reglspecs = re.compile(
-            "^\s*#PBS\s+-l\s+[^\n]*$", re.MULTILINE).findall(script)
+        reglspecs = re.compile("^\s*#PBS\s+-l\s+[^\n]*$", re.MULTILINE).findall(script)
         if reglspecs:
             l_specs = '\n'.join([x for x in reglspecs if (not re.compile("^\s*#PBS\s+-l\s+walltime").match(x))
                                  and (not vmemregexp.match(x))])
@@ -285,8 +279,7 @@ things will probably go wrong...""" % ','.join(req_keys)
 
         localmap.update({'vmem_spec': vmem_spec})
 
-        localmap.update(
-            {'wall_time_str': gen_wall_time_str(localmap['wall_time'])})
+        localmap.update({'wall_time_str': gen_wall_time_str(localmap['wall_time'])})
 
         txt = """#!/bin/bash
 #PBS -l walltime=%(wall_time_str)s
@@ -334,7 +327,7 @@ def uniquescriptname(origname, txt):
     import time
     import random
 
-     # list of alpha-numeric characters: '0'-'9' (48-56), 'A'-'Z' (65-91), 'a'-'z' (97-123)
+    # list of alpha-numeric characters: '0'-'9' (48-56), 'A'-'Z' (65-91), 'a'-'z' (97-123)
     alph = [chr(i) for i in range(48, 58) + range(65, 91) + range(97, 123)]
 
     # unique name formed by <job_name>.<timestamp>.<two random characters>
@@ -359,10 +352,9 @@ def split_unique_script_name(name):
         print "ERROR! (in split_unique_script_name) Don't know how to handle %s as a job scheduler, sorry."
         sys.exit(1)
 
+
 # checks whether resuming job with given name might work
 # return path of base script for job, or None if resuming will fail
-
-
 def checkResume(name):
 
     chkptdirbase = os.path.join(chkptdirbasebase, name)
@@ -446,14 +438,14 @@ def submitbase(base, name):
 def runall(scriptname, parent_dir, script, job_time, chkpt_time, prestage, poststage, shared, queue, mimic_pro_epi, cleanup_after_restart, vmem):
     global EPILOGUE, BASE, PRESTAGELOCAL, POSTSTAGELOCAL
 
-    ## make the directory
+    # make the directory
 
     # make sure csub_vars_map['CSUB_SCRATCH'] environment variable is there
     if csub_vars_map['CSUB_SCRATCH'] not in os.environ:
         print "%s is mandatory" % csub_vars_map['CSUB_SCRATCH']
         sys.exit(1)
 
-    ## naming convention in base and epilogue
+    # naming convention in base and epilogue
     chkptdirbase = os.path.join(chkptdirbasebase, scriptname)
     chkptdir = os.path.join(chkptdirbase, chkptsubdir)
     if os.path.isdir(chkptdir):
@@ -467,7 +459,7 @@ def runall(scriptname, parent_dir, script, job_time, chkpt_time, prestage, posts
         print "Creating chkptdir %s failed: %s" % (chkptdir, err)
         sys.exit(1)
 
-    ## make the scripts
+    # make the scripts
     if prestage:
         prestagefile = "%s/prestage" % (chkptdir)
         if prestage == 'local':
@@ -494,7 +486,7 @@ def runall(scriptname, parent_dir, script, job_time, chkpt_time, prestage, posts
             print "Can't create poststage file %s:%s" % (poststagefile, err)
             sys.exit(1)
 
-    ## the jobscript has file scriptname.sh
+    # the jobscript has file scriptname.sh
     # create job script
     jobscript = "%s/%s.sh" % (chkptdirbase, scriptname)
     try:
@@ -508,7 +500,7 @@ def runall(scriptname, parent_dir, script, job_time, chkpt_time, prestage, posts
     epilogue_script = ""
     prologue_script = ""
     if (not shared):
-        ## epilogue/prologue goes to checkpoint (prologue needs symlink to epilogue)
+        # epilogue/prologue goes to checkpoint (prologue needs symlink to epilogue)
         epilogue_script = "%s/epilogue" % chkptdirbase
         prologue_script = "%s/prologue" % chkptdirbase
         try:
@@ -619,8 +611,8 @@ fi
         sys.exit(1)
 
     if not shared:
-        ## make chkpoint tarball
-        ## options must match pack/unpack from epilogue
+        # make chkpoint tarball
+        # options must match pack/unpack from epilogue
         tb = os.path.join(chkptdir, tarbfilename)
         cmd = "tar -c -p -C %s -f %s . && touch %s.ok" % (chkptdirbase, tb, tb)
         try:
@@ -635,12 +627,11 @@ fi
             print "Tar failed: exitcode %s, output %s, cmd %s" % (ec, out, cmd)
             sys.exit(1)
 
-    ## submit 1 job
+    # submit 1 job
     submitbase(base, scriptname)
 
+
 # try to parse time string and compute in seconds
-
-
 def parsetime(time_str):
     regtime = re.compile(
         "(?P<hours>^\d+):(?P<mins>\d+):(?P<secs>\d+)$").search(time_str)
@@ -650,7 +641,8 @@ def parsetime(time_str):
         secs = int(regtime.group("secs"))
         return hours * 3600 + mins * 60 + secs
     else:
-        return -1
+        return None
+
 
 if __name__ == '__main__':
     import getopt
@@ -702,17 +694,17 @@ if __name__ == '__main__':
         if key in ["--job_time"]:
             job_time_str = value
             job_time = parsetime(job_time_str)
-            if job_time < 0:
+            if not job_time:
                 print "Failed to parse specified job time (%s)." % job_time_str
-                print "Please specify job time using <hours>h<minutes>m<seconds>s, e.g. '3h12m47s'"
+                print "Please specify job time using <hours>:<minutes>:<seconds>, e.g. '3:12:47'"
                 sys.exit(1)
             job_time_spec = True
         if key in ["--chkpt_time"]:
             chkpt_time_str = value
             chkpt_time = parsetime(chkpt_time_str)
-            if chkpt_time < 0:
+            if not chkpt_time:
                 print "Failed to parse specified job time (%s)." % chkpt_time_str
-                print "Please specify checkpoint time using <hours>h<minutes>m<seconds>s, e.g. '3h12m47s'"
+                print "Please specify checkpoint time using <hours>:<minutes>:<seconds>, e.g. '3:12:47'"
                 sys.exit(1)
             chkpt_time_spec = True
         if key in ['--pre']:
@@ -731,7 +723,7 @@ if __name__ == '__main__':
             resume_job_name = value
         if key in ['--chkpt_save_opt']:
             known_chkpt_save_opts = ['all', 'exe', 'none']
-            if not value in known_chkpt_save_opts:
+            if value not in known_chkpt_save_opts:
                 print "Invalid value for chkpt_save_opt specified: %s." % value
                 print "Please use one of the following: %s" % ','.join(known_chkpt_save_opts)
                 sys.exit(1)
