@@ -37,8 +37,9 @@ Requires torque >= 2.4.2 and BLCR
 """
 
 import os
-import re
 import popen2
+import re
+import shutil
 import sys
 
 #
@@ -752,22 +753,21 @@ If you want to vary job parameters, please see --vmem, --job_time and/or --chkpt
 
         # try and resume job with specified name
         (base, arrayid) = checkResume(resume_job_name)
+
         if base:
             # make sure it also works correctly for array jobs
             if arrayid:
                 arrayspec = arrayid
 
+            try:
+                f = open(base, "r")
+                basetxt = f.read()
+                f.close()
+            except Exception, err:
+                print "Failed to read base script %s: %s" % (base, err)
+
             # change job time and/or chkpt_time before resubmitting
             if job_time_spec or chkpt_time_spec or vmem:
-
-                try:
-                    f = open(base, "r")
-                    basetxt = f.read()
-                    f.close()
-                except Exception, err:
-                    print "Failed to read base script %s when adjusting job_time/chkpt_time: %s" % (base, err)
-                    sys.exit(1)
-
                 walltime_script = get_wall_time(basetxt)
 
                 job_time_regexp = re.compile(
@@ -801,6 +801,25 @@ If you want to vary job parameters, please see --vmem, --job_time and/or --chkpt
                     f.close()
                 except Exception, err:
                     print "Failed to backup/rewrite base script %s when adjusting job_time/chkpt_time: %s" % (base, err)
+                    sys.exit(1)
+
+            outputfiles = re.compile("^\s*#PBS\s+-o\s+(?P<chkptdirbase>\S+)/(?P<name>[^/]+).base.out\s*$", re.MULTILINE).search(basetxt).groupdict()
+            tomove = []
+
+            if arrayid:
+                outputfiles["arrayid"] = arrayid
+                tomove.append("%(chkptdirbase)s-%(arrayid)s/%(name)s-%(arrayid)s.out" % outputfiles)
+                tomove.append("%(chkptdirbase)s-%(arrayid)s/%(name)s-%(arrayid)s.err" % outputfiles)
+            else:
+                tomove.append("%(chkptdirbase)s/%(name)s.out" % outputfiles)
+                tomove.append("%(chkptdirbase)s/%(name)s.err" % outputfiles)
+
+            for filename in tomove:
+                try:
+                    print "Taking backup of output file %s" % filename
+                    shutil.copy2(filename, "%s.prev" % filename)
+                except OSError, err:
+                    print "Failed to rename the log output of the previous run: %s" % filename
                     sys.exit(1)
 
             submitbase(base, resume_job_name)
