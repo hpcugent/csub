@@ -44,7 +44,7 @@ module load scripts
 jobname=${%(CSUB_JOBNAME)s}
 ## jobname_stripped is set in BASEHEADER
 scriptname="${jobname_stripped}.sh"
-localdir=${%(CSUB_SCRATCH_NODE)s}/$jobname
+localdir="${%(CSUB_SCRATCH_NODE)s}/$jobname"
 
 myecho () {
     echo "$1"
@@ -448,13 +448,13 @@ endofjob () {
     if [ -f "$chkpoststage" ]
     then
        tmpdir=$(mktemp -d)
-       cp -a "$chkpoststage" $tmpdir/poststage
-       chmod +x /tmp/poststage
+       cp -a "$chkpoststage" "$tmpdir/poststage"
+       chmod +x "$tmpdir/poststage"
        if (( %(cleanup_chkpt)d ))
        then
        		rm -Rf "$chkdir"
        fi
-       $tmpdir/poststage
+       "$tmpdir/poststage"
     else
        if (( %(cleanup_chkpt)d ))
        then

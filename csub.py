@@ -763,8 +763,9 @@ If you want to vary job parameters, please see --vmem, --job_time and/or --chkpt
                 f = open(base, "r")
                 basetxt = f.read()
                 f.close()
-            except Exception, err:
+            except IOError as err:
                 print "Failed to read base script %s: %s" % (base, err)
+                sys.exit(1)
 
             # change job time and/or chkpt_time before resubmitting
             if job_time_spec or chkpt_time_spec or vmem:
@@ -818,7 +819,7 @@ If you want to vary job parameters, please see --vmem, --job_time and/or --chkpt
                 try:
                     print "Taking backup of output file %s" % filename
                     shutil.copy2(filename, "%s.prev" % filename)
-                except OSError, err:
+                except OSError as err:
                     print "Failed to rename the log output of the previous run: %s" % filename
                     sys.exit(1)
 
