@@ -1,5 +1,5 @@
 ##
-# Copyright 2009-2014 Ghent University
+# Copyright 2009-2015 Ghent University
 #
 # This file is part of csub,
 # originally created by the HPC team of Ghent University (http://ugent.be/hpc/en),
@@ -39,29 +39,30 @@ job_pids_cache=""
 unset %(CSUB_SERVER)s
 
 # make sure qsub is available
-module load jobs
+module load scripts
 
 jobname=${%(CSUB_JOBNAME)s}
 ## jobname_stripped is set in BASEHEADER
 scriptname="${jobname_stripped}.sh"
-localdir=$%(CSUB_SCRATCH_NODE)s/$jobname
+localdir="${%(CSUB_SCRATCH_NODE)s}/$jobname"
 
 myecho () {
     echo "$1"
 }
 
-if [ -z "$%(CSUB_SCRATCH_NODE)s" ]
+if [ -z "${%(CSUB_SCRATCH_NODE)s}" ]
 then
     echo "%(CSUB_SCRATCH_NODE)s undefined"
-    env|sort|grep %(CSUB_ORG)s
+    env | grep %(CSUB_ORG)s | sort
     exit 1
 fi
 
-%(prologue)s $%(CSUB_JOBID)s "" "" $%(CSUB_JOBNAME)s %(cleanup_chkpt)d
+%(prologue)s ${%(CSUB_JOBID)s} "" "" ${%(CSUB_JOBNAME)s} %(cleanup_chkpt)d
+
 if [ $? -ne 0 ]
 then
 	echo "ERROR! Prologue script abnormal exit."
-	exit 1
+	exit 2
 fi
 
 if [ ! -d "$localdir" ]
@@ -69,13 +70,13 @@ then
     ## no result from prologue -> shared checkpoint dir
     myecho "No localdir $localdir found (No local checkpoint)"
 
-    localdir=$%(CSUB_SCRATCH)s/chkpt/$jobname
+    localdir=${%(CSUB_SCRATCH)s}/chkpt/$jobname
 
     # this directory should be created by csub
     if [ ! -d "$localdir" ]
     then
     	## initial array job?
-    	localdir_initial=$%(CSUB_SCRATCH)s/chkpt/$jobname_stripped
+    	localdir_initial=${%(CSUB_SCRATCH)s}/chkpt/$jobname_stripped
     	if [ ! -f "$localdir/%(chkptsubdir)s/chkpt.count" ] && [ -d "$localdir_initial" ]
     	then
     		# copy initial job directory for array jobs
@@ -83,12 +84,12 @@ then
     	else
         	## problem
         	myecho "No localdir $localdir found (No shared checkpoint)"
-        	exit 1
+        	exit 3
         fi
     fi
 else
 	# copy script
-	cp "$%(CSUB_SCRATCH)s/chkpt/$jobname/$scriptname" "$localdir"
+	cp "${%(CSUB_SCRATCH)s}/chkpt/$jobname/$scriptname" "$localdir"
 fi
 
 chkdir="$localdir/%(chkptsubdir)s"
@@ -140,11 +141,11 @@ chkpoststage="$chkdir/poststage"
 
 epilogue () {
 	# replaced either by actual epilogue or a simple echo commented out
-	%(epilogue)s $%(CSUB_JOBID)s "" "" $%(CSUB_JOBNAME)s %(cleanup_chkpt)d
+	%(epilogue)s ${%(CSUB_JOBID)s} "" "" ${%(CSUB_JOBNAME)s} %(cleanup_chkpt)d
 	if [ $? -ne 0 ]
 	then
 		myecho "ERROR! Epilogue script abnormal exit."
-		exit 1
+		exit 4
 	fi
 }
 
@@ -192,13 +193,13 @@ resubmit () {
     myexit=0
     ## resubmit this job (-N is required for array jobs!)
     ## the rest of this job should finish before all else
-    out=`module load jobs; qsub -N $jobname -q $%(CSUB_QUEUE)s -o $chkbaseout -e $chkbaseerr -W depend=afterok:$%(CSUB_JOBID)s < "$chkdir/base"`
+    out=`module load scripts; qsub -N $jobname -q $%(CSUB_QUEUE)s -o $chkbaseout -e $chkbaseerr -W depend=afterok:$%(CSUB_JOBID)s < "$chkdir/base"`
     if [ $? -gt 0 ]
     then
         myecho "Job resubmit failed."
         myecho "Job resubmit output): $out"
         sleep 5
-        out=`module load jobs; qsub -N $jobname -q $%(CSUB_QUEUE)s -o $chkbaseout -e $chkbaseerr -W depend=afterok:$%(CSUB_JOBID)s < "$chkdir/base"`
+        out=`module load scripts; qsub -N $jobname -q $%(CSUB_QUEUE)s -o $chkbaseout -e $chkbaseerr -W depend=afterok:$%(CSUB_JOBID)s < "$chkdir/base"`
         if [ $? -gt 0 ]
         then
             myecho "Job resubmit failed again."
@@ -364,7 +365,7 @@ firststart () {
     then
 	   "$chkprestage"
     fi
-    cr_run -- "./$scriptname" > ${jobout} 2> ${joberr} &
+    cr_run -- "./$scriptname" > "${jobout}" 2> "${joberr}" &
     ## should be immediate
     ## i'm not sure what's fastest: starting in background or starting with cr_run
     sleep 5
@@ -413,7 +414,7 @@ makechkpt () {
     	chkfile_curTime=0
     fi
     myecho "chkfile_lastTime: $chkfile_lastTime; chkfile_curTime: $chkfile_curTime"
-    if [ -f "$chkfile" ] && [ $chkfile_curTime -gt $chkfile_lastTime ]
+    if [ -f "$chkfile" ] && [ "$chkfile_curTime" -gt "$chkfile_lastTime" ]
     then
     	myecho "Recent checkpoint found (time now: `date`):"
     	ls -l "$chkfile"
@@ -446,13 +447,14 @@ endofjob () {
     # Add stdout and stderr to central files
     if [ -f "$chkpoststage" ]
     then
-       cp -a "$chkpoststage" /tmp/poststage
-       chmod +x /tmp/poststage
+       tmpdir=$(mktemp -d)
+       cp -a "$chkpoststage" "$tmpdir/poststage"
+       chmod +x "$tmpdir/poststage"
        if (( %(cleanup_chkpt)d ))
        then
        		rm -Rf "$chkdir"
        fi
-       /tmp/poststage
+       "$tmpdir/poststage"
     else
        if (( %(cleanup_chkpt)d ))
        then

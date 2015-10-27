@@ -1,6 +1,6 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 ##
-# Copyright 2009-2014 Ghent University
+# Copyright 2009-2015 Ghent University
 #
 # This file is part of csub,
 # originally created by the HPC team of Ghent University (http://ugent.be/hpc/en),
@@ -24,23 +24,21 @@
 # You should have received a copy of the GNU General Public License
 # along with csub. If not, see <http://www.gnu.org/licenses/>.
 #
-##
-## make csub from adding the base.sh and epilogue.sh script to csub.py
+#
+# make csub from adding the base.sh and epilogue.sh script to csub.py
 
-import re
 import os
+import re
 
 epi = file('epilogue.sh').read()
 base = file('base.sh').read()
 csub = file('csub.py').read()
 
-
-regepi = re.compile(r"^EPILOGUE=.*", re.M)
-regbase = re.compile(r"^BASE=.*", re.M)
+regepi = re.compile(r"^EPILOGUE\s*=.*", re.M)
+regbase = re.compile(r"^BASE\s*=.*", re.M)
 
 csub = regepi.sub('EPILOGUE="""' + epi + "\n" + '"""', csub)
 csub = regbase.sub('BASE="""' + base + "\n" + '"""', csub)
-
 
 file('csub', 'w').write(csub)
 os.chmod('csub', 0755)
