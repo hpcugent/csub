@@ -811,9 +811,13 @@ If you want to vary job parameters, please see --vmem, --job_time and/or --chkpt
                 outputfiles["arrayid"] = arrayid
                 tomove.append("%(chkptdirbase)s-%(arrayid)s/%(name)s-%(arrayid)s.out" % outputfiles)
                 tomove.append("%(chkptdirbase)s-%(arrayid)s/%(name)s-%(arrayid)s.err" % outputfiles)
+                tomove.append("%(chkptdirbase)s/%(name)s.base.out-%(arrayid)s" % outputfiles)
+                tomove.append("%(chkptdirbase)s/%(name)s.base.err-%(arrayid)s" % outputfiles)
             else:
                 tomove.append("%(chkptdirbase)s/%(name)s.out" % outputfiles)
                 tomove.append("%(chkptdirbase)s/%(name)s.err" % outputfiles)
+                tomove.append("%(chkptdirbase)s/%(name)s.base.out" % outputfiles)
+                tomove.append("%(chkptdirbase)s/%(name)s.base.err" % outputfiles)
 
             for filename in tomove:
                 try:

@@ -59,3 +59,6 @@ target/
 
 # backup files
 *~
+
+# the generated file
+csub
