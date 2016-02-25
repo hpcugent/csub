@@ -18,6 +18,7 @@ is done. This currently does not work very well for multi threaded jobs, and not
 
 %build
 python makecsub.py
+sed -i -e 's,/usr/bin/env ,/usr/bin/,' csub
 
 %install
 mkdir -p $RPM_BUILD_ROOT/usr/bin
