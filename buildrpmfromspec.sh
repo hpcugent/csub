@@ -80,7 +80,7 @@ ec=$?
 echo "----> Cleanup"
 # if there is a directory, then delete the .tar.gz again
 if [ -d "${src_dir}" ] ;then
-   rm -vf "${src_dir}.tar.gz"
+   rm -vf "${src_dir_main}/${name}-${vers}.tar.gz"
 fi
 
 exit $ec

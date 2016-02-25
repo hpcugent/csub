@@ -12,6 +12,6 @@ cd "$here"
 rm -Rf dist
 mkdir -p dist
 
-find "$BDISTRPMBASEDIR" -regex '.*/RPMS/.*rpm' -print0 | grep -v debuginfo | xargs -0 -I '{}' cp '{}' dist
+find "$BDISTRPMBASEDIR" -regex '.*/RPMS/.*rpm' | grep -v debuginfo | xargs -I '{}' cp '{}' dist
 
-#rm -Rf "$BDISTRPMBASEDIR"
+rm -Rf "$BDISTRPMBASEDIR"
