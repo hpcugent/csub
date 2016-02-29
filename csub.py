@@ -837,6 +837,12 @@ If you want to vary job parameters, please see --vmem, --job_time and/or --chkpt
         # generate unique script name
         unique_script_name = uniquescriptname(script_filename, script)
 
+        # check if shebang is present
+        shebang = re.match("^#!", script)
+        if not shebang:
+            print "The job script %s must start with a shebang (#!)." % script_filename
+            sys.exit(1)
+
         # parent directory of script (for copying local results in prestage/poststage)
         parent_dir = os.path.dirname(os.path.abspath(script_filename))
 
