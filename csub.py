@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 ##
-# Copyright 2009-2015 Ghent University
+# Copyright 2009-2016 Ghent University
 #
 # This file is part of csub,
 # originally created by the HPC team of Ghent University (http://ugent.be/hpc/en),
 # with support of Ghent University (http://ugent.be/hpc),
 # the Flemish Supercomputer Centre (VSC) (https://vscentrum.be/nl/en),
-# the Hercules foundation (http://www.herculesstichting.be/in_English)
+# the Flemish Research Foundation (http://www.fwo.be/en),
 # and the Department of Economy, Science and Innovation (EWI) (http://www.ewi-vlaanderen.be/en).
 #
 # http://github.com/hpcugent/csub
@@ -836,6 +836,12 @@ If you want to vary job parameters, please see --vmem, --job_time and/or --chkpt
         # start new job
         # generate unique script name
         unique_script_name = uniquescriptname(script_filename, script)
+
+        # check if shebang is present
+        shebang = re.match("^#!", script)
+        if not shebang:
+            print "The job script %s must start with a shebang (#!)." % script_filename
+            sys.exit(1)
 
         # parent directory of script (for copying local results in prestage/poststage)
         parent_dir = os.path.dirname(os.path.abspath(script_filename))
