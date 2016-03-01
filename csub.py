@@ -177,7 +177,7 @@ def get_job_name_spec(script):
             return None
 
     else:
-        print "(get_job_name_spec) Don't know how to handle %s as a job scheduler, sorry."
+        sys.stderr.write("(get_job_name_spec) Don't know how to handle %s as a job scheduler, sorry.\n")
         sys.exit(1)
 
 
@@ -188,7 +188,7 @@ def get_wall_time(script):
         walltime = walltime_list[0] * 3600 + walltime_list[1] * 60 + walltime_list[2]
         return walltime
     else:
-        print "(get_wall_time) Don't know how to handle %s as a job scheduler, sorry."
+        sys.stderr.write("(get_wall_time) Don't know how to handle %s as a job scheduler, sorry.\n")
         sys.exit(1)
 
 
@@ -197,7 +197,7 @@ def replace_walltime_str(script, wall_time_str):
         walltime_regexp = re.compile("^(#PBS -l walltime)=(?P<walltime>[0-9:]+)\s*(\S*)$", re.MULTILINE)
         return walltime_regexp.sub(r"\1=%s \3" % wall_time_str, script)
     else:
-        print "(replace_walltime_str) Don't know how to handle %s as a job scheduler, sorry."
+        sys.stderr.write("(replace_walltime_str) Don't know how to handle %s as a job scheduler, sorry.\n")
         sys.exit(1)
 
 
@@ -206,7 +206,7 @@ def replace_vmem(script, vmem):
         vmem_regexp = re.compile("^(#PBS -l vmem)=(?P<vmem>.+)\s*(\S*)$", re.MULTILINE)
         return vmem_regexp.sub(r"\1=%s \3" % vmem, script)
     else:
-        print "(replace_vmem) Don't know how to handle %s as a job scheduler, sorry."
+        sys.stderr.write("(replace_vmem) Don't know how to handle %s as a job scheduler, sorry.\n")
         sys.exit(1)
 
 
@@ -218,10 +218,10 @@ def gen_pro_epi_spec(pro_epi, pro_epi_script):
         elif pro_epi == "epilogue":
             return "#PBS -l epilogue=%s" % (pro_epi, pro_epi_script)
         else:
-            print "(gen_pro_epi_spec) Don't know how to handle \'%s\'." % pro_epi
+            sys.stderr.write("(gen_pro_epi_spec) Don't know how to handle \'%s\'.\n" % pro_epi)
             sys.exit(1)
     else:
-        print "(gen_pro_epi_spec) Don't know how to handle %s as a job scheduler, sorry."
+        sys.stderr.write("(gen_pro_epi_spec) Don't know how to handle %s as a job scheduler, sorry.\n")
         sys.exit(1)
 
 
@@ -234,7 +234,7 @@ def gen_wall_time_str(wall_time):
         wall_time_str = "%d:%d:%d" % (wall_time_hours, wall_time_mins, wall_time_secs)
         return wall_time_str
     else:
-        print "(gen_wall_time_str) Don't know how to handle %s as a job scheduler, sorry."
+        sys.stderr.write("(gen_wall_time_str) Don't know how to handle %s as a job scheduler, sorry.\n")
         sys.exit(1)
 
 
@@ -311,7 +311,7 @@ fi
         """ % localmap
         return txt
     else:
-        print "(gen_base_header) Don't know how to handle %s as a job scheduler, sorry."
+        sys.stderr.write("(gen_base_header) Don't know how to handle %s as a job scheduler, sorry.\n")
         sys.exit(1)
 
 
@@ -347,10 +347,10 @@ def split_unique_script_name(name):
             arrayid = m.group('arrayid')
             return (cleanname, arrayid)
         else:
-            print "ERROR! Unexpected format of job name."
+            sys.stderr.write("ERROR! Unexpected format of job name.\n")
             sys.exit(1)
     else:
-        print "ERROR! (in split_unique_script_name) Don't know how to handle %s as a job scheduler, sorry."
+        sys.stderr.write("ERROR! (in split_unique_script_name) Don't know how to handle %s as a job scheduler, sorry.\n")
         sys.exit(1)
 
 
@@ -393,7 +393,7 @@ def checkResume(name):
                 elif chkptfilefound:
                     print "# Checkpoint file for job found @ %s" % chkptfile
                 else:
-                    print "ERROR! Neither job tarball (%s) nor checkpoint file (%s) found. Huh?" % (tarbfile, chkptfile)
+                    sys.stderr.write("ERROR! Neither job tarball (%s) nor checkpoint file (%s) found. Huh?\n" % (tarbfile, chkptfile))
 
                 # check for base script
                 basescript = os.path.join(
@@ -425,13 +425,13 @@ def submitbase(base, name):
             sys.exit(1)
 
         if ec > 0:
-            print "Submission failed: exitcode %s, output %s" % (ec, out)
+            sys.stderr.write("Submission failed: exitcode %s, output %s\n" % (ec, out))
             sys.exit(1)
 
         print "Job with name %s succesfully submitted" % (name)
 
     else:
-        print "ERROR! (in submitbase) Don't know how to handle %s as a job scheduler, sorry."
+        sys.stderr.write("ERROR! (in submitbase) Don't know how to handle %s as a job scheduler, sorry.\n")
         sys.exit(1)
 
 
@@ -443,21 +443,21 @@ def runall(scriptname, parent_dir, script, job_time, chkpt_time, prestage, posts
 
     # make sure csub_vars_map['CSUB_SCRATCH'] environment variable is there
     if csub_vars_map['CSUB_SCRATCH'] not in os.environ:
-        print "%s is mandatory" % csub_vars_map['CSUB_SCRATCH']
+        sys.stderr.write("%s is mandatory\n" % csub_vars_map['CSUB_SCRATCH'])
         sys.exit(1)
 
     # naming convention in base and epilogue
     chkptdirbase = os.path.join(chkptdirbasebase, scriptname)
     chkptdir = os.path.join(chkptdirbase, chkptsubdir)
     if os.path.isdir(chkptdir):
-        print "Chkpt dir %s already exists." % chkptdir
+        sys.stderr.write("Chkpt dir %s already exists.\n" % chkptdir)
         sys.exit(1)
 
     # make the checkpoint directory
     try:
         os.makedirs(chkptdir)
     except Exception, err:
-        print "Creating chkptdir %s failed: %s" % (chkptdir, err)
+        sys.stderr.write("Creating chkptdir %s failed: %s\n" % (chkptdir, err))
         sys.exit(1)
 
     # make the scripts
@@ -470,7 +470,7 @@ def runall(scriptname, parent_dir, script, job_time, chkpt_time, prestage, posts
             file(prestagefile, 'w').write(prestagetxt)
             os.chmod(prestagefile, 0755)
         except Exception, err:
-            print "Can't create prestage file %s:%s" % (prestagefile, err)
+            sys.stderr.write("Can't create prestage file %s:%s\n" % (prestagefile, err))
             sys.exit(1)
 
     if poststage:
@@ -484,7 +484,7 @@ def runall(scriptname, parent_dir, script, job_time, chkpt_time, prestage, posts
             file(poststagefile, 'w').write(poststagetxt)
             os.chmod(poststagefile, 0755)
         except Exception, err:
-            print "Can't create poststage file %s:%s" % (poststagefile, err)
+            sys.stderr.write("Can't create poststage file %s:%s\n" % (poststagefile, err))
             sys.exit(1)
 
     # the jobscript has file scriptname.sh
@@ -494,7 +494,7 @@ def runall(scriptname, parent_dir, script, job_time, chkpt_time, prestage, posts
         file(jobscript, 'w').write(script)
         os.chmod(jobscript, 0755)
     except Exception, err:
-        print "Can't create jobscript file %s:%s" % (jobscript, err)
+        sys.stderr.write("Can't create jobscript file %s:%s\n" % (jobscript, err))
         sys.exit(1)
 
     # prepare prologue and epilogue scripts
@@ -509,13 +509,13 @@ def runall(scriptname, parent_dir, script, job_time, chkpt_time, prestage, posts
             file(epilogue_script, 'w').write(epiloguetxt)
             os.chmod(epilogue_script, 0755)
         except Exception, err:
-            print "Can't create epilogue file %s:%s" % (epilogue_script, err)
+            sys.stderr.write("Can't create epilogue file %s:%s\n" % (epilogue_script, err))
             sys.exit(1)
 
         try:
             os.symlink(epilogue_script, prologue_script)
         except Exception, err:
-            print "Can't create prologue link %s from epilogue file %s:%s" % (prologue_script, epilogue_script, err)
+            sys.stderr.write("Can't create prologue link %s from epilogue file %s:%s\n" % (prologue_script, epilogue_script, err))
             sys.exit(1)
 
     user_chkpt_script = """#!/bin/bash
@@ -557,7 +557,7 @@ fi
         file(user_chkpt_script_path, 'w').write(user_chkpt_script)
         os.chmod(user_chkpt_script_path, 0755)
     except Exception, err:
-        print "Can't create user checkpointing script %s:%s" % (user_chkpt_script, err)
+        sys.stderr.write("Can't create user checkpointing script %s:%s\n" % (user_chkpt_script, err))
         sys.exit(1)
 
     # either mimic scheduler pro/epilogue script functionality or not
@@ -608,7 +608,7 @@ fi
     try:
         file(base, 'w').write(baseheader + base_script)
     except Exception, err:
-        print "Can't create base jobscript %s:%s" % (base, err)
+        sys.stderr.write("Can't create base jobscript %s:%s\n" % (base, err))
         sys.exit(1)
 
     if not shared:
@@ -622,10 +622,10 @@ fi
             ec = p.wait()  # wait for process, catch return value
             out = p.fromchild.read()  # read output of tar command
         except Exception, err:
-            print "Something went wrong with forking tar (%s): %s" % (cmd, err)
+            sys.stderr.write("Something went wrong with forking tar (%s): %s\n" % (cmd, err))
             sys.exit(1)
         if ec > 0:
-            print "Tar failed: exitcode %s, output %s, cmd %s" % (ec, out, cmd)
+            sys.stderr.write("Tar failed: exitcode %s, output %s, cmd %s\n" % (ec, out, cmd))
             sys.exit(1)
 
     # submit 1 job
@@ -686,7 +686,7 @@ if __name__ == '__main__':
             try:
                 script = open(script_filename).read()
             except Exception, err:
-                print "Can't read jobscript %s:%s" % (script_filename, err)
+                sys.stderr.write("Can't read jobscript %s:%s\n" % (script_filename, err))
                 sys.exit(1)
         if key in ["-q"]:
             queue = value
@@ -696,16 +696,16 @@ if __name__ == '__main__':
             job_time_str = value
             job_time = parsetime(job_time_str)
             if not job_time:
-                print "Failed to parse specified job time (%s)." % job_time_str
-                print "Please specify job time using <hours>:<minutes>:<seconds>, e.g. '3:12:47'"
+                sys.stderr.write("Failed to parse specified job time (%s).\n" % job_time_str)
+                sys.stderr.write("Please specify job time using <hours>:<minutes>:<seconds>, e.g. '3:12:47'\n")
                 sys.exit(1)
             job_time_spec = True
         if key in ["--chkpt_time"]:
             chkpt_time_str = value
             chkpt_time = parsetime(chkpt_time_str)
             if not chkpt_time:
-                print "Failed to parse specified job time (%s)." % chkpt_time_str
-                print "Please specify checkpoint time using <hours>:<minutes>:<seconds>, e.g. '3:12:47'"
+                sys.stderr.write("Failed to parse specified job time (%s).\n" % chkpt_time_str)
+                sys.stderr.write("Please specify checkpoint time using <hours>:<minutes>:<seconds>, e.g. '3:12:47'\n")
                 sys.exit(1)
             chkpt_time_spec = True
         if key in ['--pre']:
@@ -725,8 +725,8 @@ if __name__ == '__main__':
         if key in ['--chkpt_save_opt']:
             known_chkpt_save_opts = ['all', 'exe', 'none']
             if value not in known_chkpt_save_opts:
-                print "Invalid value for chkpt_save_opt specified: %s." % value
-                print "Please use one of the following: %s" % ','.join(known_chkpt_save_opts)
+                sys.stderr.write("Invalid value for chkpt_save_opt specified: %s.\n" % value)
+                sys.stderr.write("Please use one of the following: %s\n" % ','.join(known_chkpt_save_opts))
                 sys.exit(1)
             else:
                 chkpt_save_opt = value
@@ -764,7 +764,7 @@ If you want to vary job parameters, please see --vmem, --job_time and/or --chkpt
                 basetxt = f.read()
                 f.close()
             except IOError as err:
-                print "Failed to read base script %s: %s" % (base, err)
+                sys.stderr.write("Failed to read base script %s: %s\n" % (base, err))
                 sys.exit(1)
 
             # change job time and/or chkpt_time before resubmitting
@@ -801,7 +801,7 @@ If you want to vary job parameters, please see --vmem, --job_time and/or --chkpt
                     f.write(basetxt)
                     f.close()
                 except Exception, err:
-                    print "Failed to backup/rewrite base script %s when adjusting job_time/chkpt_time: %s" % (base, err)
+                    sys.stderr.write("Failed to backup/rewrite base script %s when adjusting job_time/chkpt_time: %s\n" % (base, err))
                     sys.exit(1)
 
             outputfiles = re.compile("^\s*#PBS\s+-o\s+(?P<chkptdirbase>\S+)/(?P<name>[^/]+).base.out\s*$", re.MULTILINE).search(basetxt).groupdict()
@@ -824,13 +824,13 @@ If you want to vary job parameters, please see --vmem, --job_time and/or --chkpt
                     print "Taking backup of output file %s" % filename
                     shutil.copy2(filename, "%s.prev" % filename)
                 except OSError as err:
-                    print "Failed to rename the log output of the previous run: %s" % filename
+                    sys.stderr.write("Failed to rename the log output of the previous run: %s\n" % filename)
                     sys.exit(1)
 
             submitbase(base, resume_job_name)
             print "Job %s succesfully resumed." % resume_job_name
         else:
-            print "Resuming of job %s failed. Sorry." % resume_job_name
+            sys.stderr.write("Resuming of job %s failed. Sorry.\n" % resume_job_name)
             sys.exit(1)
     else:
         # start new job
@@ -840,7 +840,7 @@ If you want to vary job parameters, please see --vmem, --job_time and/or --chkpt
         # check if shebang is present
         shebang = re.match("^#!", script)
         if not shebang:
-            print "The job script %s must start with a shebang (#!)." % script_filename
+            sys.stderr.write("The job script %s must start with a shebang (#!).\n" % script_filename)
             sys.exit(1)
 
         # parent directory of script (for copying local results in prestage/poststage)
