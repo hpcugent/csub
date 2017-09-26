@@ -29,6 +29,13 @@
 ## (no need for /bin/bash, is taken care of by BASEHEADER)
 ##
 
+DMTCP_COMMAND=dmtcp_command
+DMTCP_COORDINATOR=dmtcp_coordinator
+DMTCP_LAUNCH=dmtcp_launch
+DMTCP_RESTART=dmtcp_restart
+
+PORTFILE=portfile
+
 # empty job_pids cache
 job_pids_cache=""
 
@@ -38,12 +45,10 @@ job_pids_cache=""
 # which may cause next job to be submitted to wrong cluster
 unset %(CSUB_SERVER)s
 
-# make sure qsub is available
-module load scripts
-
 jobname=${%(CSUB_JOBNAME)s}
 ## jobname_stripped is set in BASEHEADER
 scriptname="${jobname_stripped}.sh"
+script_pid=0
 localdir="${%(CSUB_SCRATCH_NODE)s}/$jobname"
 
 myecho () {
@@ -95,7 +100,6 @@ fi
 chkdir="$localdir/%(chkptsubdir)s"
 mkdir -p "$chkdir/"
 
-chkfile="$chkdir/chkpt.file"
 chktarb="$%(CSUB_SCRATCH)s/chkpt/$jobname/%(chkptsubdir)s/job.localdir.tarball"
 chklock="$chkdir/chkpt.lock"
 chkstat="$chkdir/chkpt.status"
@@ -103,20 +107,13 @@ chkid="$chkdir/chkpt.count"
 
 # set environment variable with location of checkpoint file
 # can be used by user program to checkpoint itself
-export CSUB_CHECKPOINT_FILE="$chkfile"
+export CSUB_CHECKPOINT_FILE=`ls $chkdir/*.dmtcp 2> /dev/null`
 # initialize env variable for PID of process to be checkpointed
 export CSUB_MASTER_PID_FILE="$chkdir/csub_master_pid"
 # file to be touched/written if user kills the process
 export CSUB_KILL_ACK_FILE="$chkdir/script_killed_by_user"
 # script to be used by user to checkpoint
 export CSUB_USER_CHKPT_SCRIPT="$chkdir/%(user_chkpt_script_file)s"
-
-chkfile_lastTime=0
-if [ -f "$chkfile" ]
-then
-	# double percent, based this script is pushed through Python
-	chkfile_lastTime=`stat -c %%Y "$chkfile"`
-fi
 
 jobout="$localdir/$jobname.out"
 joberr="$localdir/$jobname.err"
@@ -138,6 +135,21 @@ cr_restart_restore="--no-restore-pid"
 
 chkprestage="$chkdir/prestage"
 chkpoststage="$chkdir/poststage"
+
+timestamp_latest_checkpoint() {
+    # determine timestamp of most recent checkpoint (0 if no checkpoint files are found)
+    tmpfile=`mktemp`
+    find $chkdir -name '*.dmtcp' > $tmpfile 2> /dev/null
+    if [ `cat $tmpfile | wc -l` -gt 0 ]; then
+        latest_checkpoint=`tail -1 $tmpfile`
+	    # double percent, because this script is pushed through Python
+        timestamp=`stat -c %%Y $latest_checkpoint`
+    else
+        timestamp=0
+    fi
+    rm $tmpfile
+    echo $timestamp
+}
 
 epilogue () {
 	# replaced either by actual epilogue or a simple echo commented out
@@ -161,30 +173,6 @@ endjob () {
     fi
 }
 
-mypid () {
-	# find match between pids of this job's children
-	# and pids of processes excuting the script
-    script_pids=`/sbin/pidof -x "$scriptname"`
-    if [ -z $job_pids_cached ]
-    then
-    	job_pids_cached=`pstree -p $$ | tr '\\\\n' ' ' | sed 's/[^0-9]*\\([0-9]\\+\\)[^0-9]*/\\\\1 /g'`
-    fi
-    for job_pid in $job_pids_cached;
-    do
-    	for script_pid in $script_pids;
-    	do
-    		if [ $job_pid -eq $script_pid ];
-    		then
-    			echo $job_pid;
-    			return;
-    		fi;
-    	done;
-    done
-
-    # no match found (job done?)
-    echo 0
-}
-
 resubmit () {
     fun=resubmit
     myecho
@@ -193,13 +181,13 @@ resubmit () {
     myexit=0
     ## resubmit this job (-N is required for array jobs!)
     ## the rest of this job should finish before all else
-    out=`module load scripts; qsub -N $jobname -q $%(CSUB_QUEUE)s -o $chkbaseout -e $chkbaseerr -W depend=afterok:$%(CSUB_JOBID)s < "$chkdir/base"`
+    out=`qsub -N $jobname -q $%(CSUB_QUEUE)s -o $chkbaseout -e $chkbaseerr -W depend=afterok:$%(CSUB_JOBID)s < "$chkdir/base"`
     if [ $? -gt 0 ]
     then
         myecho "Job resubmit failed."
         myecho "Job resubmit output): $out"
         sleep 5
-        out=`module load scripts; qsub -N $jobname -q $%(CSUB_QUEUE)s -o $chkbaseout -e $chkbaseerr -W depend=afterok:$%(CSUB_JOBID)s < "$chkdir/base"`
+        out=`qsub -N $jobname -q $%(CSUB_QUEUE)s -o $chkbaseout -e $chkbaseerr -W depend=afterok:$%(CSUB_JOBID)s < "$chkdir/base"`
         if [ $? -gt 0 ]
         then
             myecho "Job resubmit failed again."
@@ -261,18 +249,30 @@ restart () {
 	   crcount=0
     fi
 
-    ## cr_restart
-    ## wait until restart is really done
-    ## nice trick from KennethHoste
+    # resume from checkpoint
+    # wait until resume is actually complete via lockfile
     rm -f "$chkrestat"
     rm -f "$chklock"
     lockfile "$chklock"
-    cr_restart $cr_restart_restore --run-on-success="echo OK > \"$chkrestat\" && rm -f \"$chklock\"" --run-on-failure="echo FAILURE > \"$chkrestat\" && rm -f \"$chklock\"" -f "$chkfile" >& "$chkreout" &
+    # using --new-coordinator doesn't seem to work, so start DMTCP coordinator ourselves as daemon and use that
+    $DMTCP_COORDINATOR --daemon --coord-logfile "$chkdir/coord.log.$$" --coord-port 0 --port-file "$chkdir/$PORTFILE" --ckptdir $chkdir --exit-on-last --interval 0
+    coord_port=$(cat "$chkdir/$PORTFILE")
+    myecho "DMTCP coordinator port: $coord_port"
+    $DMTCP_RESTART --coord-port $coord_port `find $chkdir -name '*.dmtcp'` &
+    script_pid=$!
+    myecho "PID of relaunched script: $script_pid"
+    # check status of relaunched script shortly after
+    sleep 5
+    ps -p $script_pid > /dev/null
+    if [ $? -eq 0 ]; then
+        echo OK > "$chkrestat" && rm -f "$chklock"
+    else
+        echo FAILURE > "$chkrestat" && rm -f "$chklock"
+    fi
     lockfile "$chklock"
     rm -f "$chklock"
 
-    pid=`mypid`
-	echo $pid > $CSUB_MASTER_PID_FILE
+	echo $script_pid > $CSUB_MASTER_PID_FILE
 
     crstat='UNKNOWN'
     if [ -f "$chkrestat" ]
@@ -282,14 +282,14 @@ restart () {
     else
         myecho "Restart status file $chkrestat not found. Is this a restart failure?"
         sleep 5
-        pid=`mypid`
-        if [ $pid -eq 0 ]
+        ps -p $script_pid > /dev/null
+        if [ $? -eq 0 ]
         then
-            myecho "Restart status check: Process not running."
-            crstat='FAILURE'
-        else
             myecho "Restart status check: Process running."
             crstat='OK'
+        else
+            myecho "Restart status check: Process not running."
+            crstat='FAILURE'
         fi
     fi
 
@@ -303,8 +303,8 @@ restart () {
 	    cleanup_after_restart=%(cleanup_after_restart)d
 	    if (( $cleanup_after_restart ))
 	    then
-	    	myecho "Cleaning up checkpoint and tarball after successful restart..."
-	    	rm "$chkfile" "$chktarb"
+	    	myecho "Cleaning up checkpoint file(s) and tarball after successful restart..."
+	    	rm "$chkdir/*.dmtcp" "$chktarb"
 	    fi
 	    ;;
 	FAILURE)
@@ -313,7 +313,6 @@ restart () {
 
 	    myecho "Failed restart restart main id $chkptid restart nr $crcount of $crcountmax at `hostname`"
 	    myecho "Begin of restart output"
-	    echo "cr_restart $cr_restart_restore --run-on-success=\"echo OK \> $chkrestat \&\& rm -f $chklock\" --run-on-failure=\"echo FAILURE \> $chkrestat \&\& rm -f $chklock\" -f $chkfile"
 	    cat $chkreout
 	    myecho "End of restart output"
 	    # double percent character for module operation, because this script is pushed through Python string formatting!
@@ -329,7 +328,7 @@ restart () {
 	    ;;
 	*)
 	    ## should not happen
-	    myecho "cr_restart state unknown ($crstat)."
+	    myecho "Unknown restart state: $crstat"
 	    ;;
     esac
     myecho "end $fun `date`"
@@ -365,16 +364,16 @@ firststart () {
     then
 	   "$chkprestage"
     fi
-    cr_run -- "./$scriptname" > "${jobout}" 2> "${joberr}" &
-    ## should be immediate
-    ## i'm not sure what's fastest: starting in background or starting with cr_run
+    $DMTCP_LAUNCH --coord-logfile "$chkdir/coord.log.$$" --interval 0 --ckptdir "$chkdir" --new-coordinator --port-file $chkdir/$PORTFILE bash -c "./${scriptname} > ${jobout} 2> ${joberr}" &
+    script_pid=$!
+    myecho "PID of running script: $script_pid"
+    # check status of process shortly after launch
     sleep 5
-    pid=`mypid`
-    if [ $pid -gt 0 ]
-    then
-    	echo $pid > "$CSUB_MASTER_PID_FILE"
+    ps -p $script_pid > /dev/null
+    if [ $? -eq 0 ]; then
+    	echo $script_pid > "$CSUB_MASTER_PID_FILE"
     else
-    	echo "PID of process started with cr_run running $scriptname not found... Exiting!"
+    	echo "PID of process running $scriptname not found... Exiting!"
     	exit 1
     fi
     myecho "end $fun `date`"
@@ -391,10 +390,10 @@ chkptsleep () {
     do
       # reverse 1s for actual check
       sleep $(($chkslint-1))
-      pid=`mypid`
-      if [ $pid -eq 0 ]
-      then
-	  	return $pid
+      # exit sleep loop as soon as process is no longer there
+      ps -p $script_pid > /dev/null
+      if [ $? -ne 0 ]; then
+        return
       fi
       sleeping=$(($sleeping+$chkslint))
     done
@@ -406,35 +405,26 @@ makechkpt () {
     fun=makechkpt
     myecho
     myecho "begin $fun `date`"
-    if [ -f "$chkfile" ]
-    then
-        # double percent, based this script is pushed through Python
-    	chkfile_curTime=`stat -c %%Y "$chkfile"`
-    else
-    	chkfile_curTime=0
-    fi
+    chkfile_curTime=`timestamp_latest_checkpoint`
     myecho "chkfile_lastTime: $chkfile_lastTime; chkfile_curTime: $chkfile_curTime"
-    if [ -f "$chkfile" ] && [ "$chkfile_curTime" -gt "$chkfile_lastTime" ]
-    then
-    	myecho "Recent checkpoint found (time now: `date`):"
-    	ls -l "$chkfile"
-    	pid=`mypid`
-    	if [ $pid -gt 0 ]
-    	then
-    		"Process (pid: $pid) still running, killing it..."
-    		kill $pid
+    if [ "$chkfile_curTime" -gt "$chkfile_lastTime" ]; then
+    	myecho "Recent checkpoint(s) found (timestamp: `date -d @$chkfile_curTime`, time now: `date`):"
+    	ps -p $script_pid > /dev/null
+    	if [ $? -eq 0 ]; then
+    		echo "Process (pid: $script_pid) still running, killing it..."
+    		kill $script_pid
     	fi
     	myecho "Using checkpoint found, not checkpointing again."
     else
     	myecho "No recent checkpoint found, so checkpointing..."
-    	if [ "x%(CSUB_KILL_MODE)s" == "xterm" ]
-    	then
-    		cr_checkpoint --term --save-$chksave $pid -f "$chkfile"
-    		sleep 30
-    		kill -9 $pid
-    	else
-    		cr_checkpoint --kill --save-$chksave $pid -f "$chkfile"
-    	fi
+        coord_port=$(cat "$chkdir/$PORTFILE")
+        myecho "DMTCP coordinator port: $coord_port"
+        # checkpoint & wait until checkpointing is done
+        # note: specified kill mode '%(CSUB_KILL_MODE)s' is blatently ignored here,
+        # DMTCP does not support sending a particular signal
+        $DMTCP_COMMAND --port $coord_port --bcheckpoint
+        # kill processes & DMTCP coordinator
+        $DMTCP_COMMAND --port $coord_port --quit
     fi
     myecho "end $fun `date`"
     myecho
@@ -477,14 +467,15 @@ myecho
 myecho "BEGIN base $%(CSUB_JOBID)s `date`"
 myecho
 
-# check whether BLCR support is available
-/sbin/lsmod | grep blcr >& /dev/null
-if [ $? -ne 0 ]
-then
-	myecho "No BLCR support available here (`hostname`), aborting job."
-	endjob
-	exit 30
-fi
+# check whether DMTCP commands are available
+for cmd in $DMTCP_COMMAND $DMTCP_LAUNCH $DMTCP_RESTART; do
+    which $cmd > /dev/null
+    if [ $? -ne 0 ]; then
+        myecho "ERROR: DMTCP command '$cmd' not found, aborting job"
+        endjob
+        exit 30
+    fi
+done
 
 cd "$localdir"
 if [ $? -gt 0 ]
@@ -496,28 +487,27 @@ fi
 rm -f job.normal
 rm -f job.complete
 
-
-
-if [ -f "$chkfile" ]
-then
-    restart
-else
+myecho "Checking for available checkpoints @ ${chkdir}..."
+chkfile_lastTime=`timestamp_latest_checkpoint`
+if [ $chkfile_lastTime -eq 0 ]; then
+    myecho "No checkpoints found, first start..."
     firststart
+else
+    myecho "Found recent checkpoint (timestamp: `date -d @$chkfile_lastTime`), restarting..."
+    restart
 fi
 
-pid=`mypid`
-if [ $pid -eq 0 ]
+ps -p $script_pid > /dev/null
+if [ $? -ne 0 ]
 then
     myecho "Process not running before sleep."
 fi
 
 chkptsleep
 
-pid=`mypid`
-
-## check whether job is still running or finished
-if [ $pid -gt 0 ]
-then
+# check whether job is still running or finished
+ps -p $script_pid > /dev/null
+if [ $? -eq 0 ]; then
   makechkpt
   resubmit # exits
 else
