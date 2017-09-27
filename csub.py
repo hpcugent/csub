@@ -156,8 +156,6 @@ def usage():
 
         --resume=<string>        Try to resume a checkpointed job; argument should be unique name of job to resume [default: none]
 
-        --chkpt_save_opt=<string>        Save option to use for cr_checkpoint (all|exe|none) [default: exe]
-
         --term_kill_mode        Kill checkpointed process with SIGTERM instead of SIGKILL after checkpointing [defailt: SIGKILL]
 
         --vmem=<string>        Specify amount of virtual memory required [default: none specified]"
@@ -584,7 +582,6 @@ fi
                 'cleanup_after_restart': cleanup_after_restart,
                 'cleanup_chkpt': cleanup_chkpt,
                 'chkptsubdir': chkptsubdir,
-                'chkpt_save_opt': chkpt_save_opt,
                 'user_chkpt_script_file': user_chkpt_script_file
                 }
     localmap.update(csub_vars_map)
@@ -674,7 +671,6 @@ if __name__ == '__main__':
     cleanup_after_restart = False
     cleanup_chkpt = True
     resume_job_name = None
-    chkpt_save_opt = "exe"
     vmem = None
 
     # read command line options specified
@@ -722,18 +718,13 @@ if __name__ == '__main__':
             cleanup_chkpt = False
         if key in ['--resume']:
             resume_job_name = value
-        if key in ['--chkpt_save_opt']:
-            known_chkpt_save_opts = ['all', 'exe', 'none']
-            if value not in known_chkpt_save_opts:
-                sys.stderr.write("Invalid value for chkpt_save_opt specified: %s.\n" % value)
-                sys.stderr.write("Please use one of the following: %s\n" % ','.join(known_chkpt_save_opts))
-                sys.exit(1)
-            else:
-                chkpt_save_opt = value
         if key in ['--term_kill_mode']:
             csub_vars_map.update({'CSUB_KILL_MODE': 'term'})
         if key in ['--vmem']:
             vmem = value
+        if key in ['--chkpt_save_opt']:
+            sys.stderr.write("Use of --chkpt_save_opt is no longer supported\n")
+            sys.exit(1)
 
     if not script and not resume_job_name:
         print """ERROR! No jobscript read or job to resume specified.

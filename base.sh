@@ -129,10 +129,6 @@ stcountmax=5
 chkslint=60
 chksltot=%(job_time)d
 
-chksave=%(chkpt_save_opt)s
-
-cr_restart_restore="--no-restore-pid"
-
 chkprestage="$chkdir/prestage"
 chkpoststage="$chkdir/poststage"
 
