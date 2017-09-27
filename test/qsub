@@ -1,0 +1,55 @@
+#!/bin/bash
+# Fake 'qsub' (PBS/Torque job submission) command
+# Starts specified script in background, guarded by lockfile /tmp/$USER/fake_qsub.lock
+
+echo "qsub args: $@" >&2
+OPTIND=1
+while getopts "N:o:e:W:" opt; do
+    case "$opt" in
+    o)
+        stdout_file=$OPTARG
+        ;;
+    e)
+        stderr_file=$OPTARG
+        ;;
+    N)
+        PBS_JOBNAME=$OPTARG
+        ;;
+    W)
+        ;;
+    esac
+done
+shift $((OPTIND-1))
+
+echo "qsub remaining $# args after option parsing: $@" >&2
+if [ $# -ne 1 ]; then
+    echo "ERROR! Usage: $0 <path to script to run>"
+    exit 1
+fi
+
+if [ -z $PBS_JOBNAME ]; then
+    PBS_JOBNAME=`grep '^#PBS -N' $1 | sed 's/.*-N //g'`
+fi
+export PBS_JOBNAME
+
+if [ -z $stdout_file ]; then
+    stdout_file=`grep '^#PBS -o' $1 | sed 's/.*-o //g'`
+fi
+if [ -z $stderr_file ]; then
+    stderr_file=`grep '^#PBS -e' $1 | sed 's/.*-e //g'`
+fi
+
+export PBS_JOBID=$RANDOM
+echo $PBS_JOBID
+
+lock=/tmp/$USER/fake_qsub.lock
+rm -f $lock
+lockfile $lock
+rm $lock
+
+tmpfile=`mktemp`
+cp $1 $tmpfile
+chmod u+x $tmpfile
+$tmpfile > $stdout_file 2> $stderr_file &
+ps xfu | strings >&2
+echo $stdout_file $stderr_file >&2
