@@ -135,7 +135,8 @@ chkpoststage="$chkdir/poststage"
 
 timestamp_latest_checkpoint() {
     # determine timestamp of most recent checkpoint (0 if no checkpoint files are found)
-    timestamp=`find $chkdir -maxdepth 1 -name '*.dmtcp' -printf '%T@\n' | sort -n | tail -1 | cut -f1 -d.`
+    # note: percent and newline must be escaped since this script is templated by Python!
+    timestamp=`find $chkdir -maxdepth 1 -name '*.dmtcp' -printf '%%T@\\n' | sort -n | tail -1 | cut -f1 -d.`
     echo ${timestamp:-0}
 }
 
