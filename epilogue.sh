@@ -148,12 +148,6 @@ case $cmd in
 	;;
 esac
 
-
-## set primitive environment
-export USER=`whoami`
-export HOME=`getent passwd $USER |cut -d ':' -f 6`
-. %(CSUB_PROFILE_SCRIPT)s
-
 ##
 ## set some general values
 ##
