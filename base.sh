@@ -135,17 +135,8 @@ chkpoststage="$chkdir/poststage"
 
 timestamp_latest_checkpoint() {
     # determine timestamp of most recent checkpoint (0 if no checkpoint files are found)
-    tmpfile=`mktemp`
-    find $chkdir -name '*.dmtcp' > $tmpfile 2> /dev/null
-    if [ `cat $tmpfile | wc -l` -gt 0 ]; then
-        latest_checkpoint=`tail -1 $tmpfile`
-	    # double percent, because this script is pushed through Python
-        timestamp=`stat -c %%Y $latest_checkpoint`
-    else
-        timestamp=0
-    fi
-    rm $tmpfile
-    echo $timestamp
+    timestamp=`find $chkdir -maxdepth 1 -name '*.dmtcp' -printf '%T@\n' | sort -n | tail -1 | cut -f1 -d.`
+    echo ${timestamp:-0}
 }
 
 epilogue () {
@@ -260,7 +251,7 @@ restart () {
     myecho "PID of relaunched script: $script_pid"
     # check status of relaunched script shortly after
     sleep 5
-    ps -p $script_pid > /dev/null
+    kill -0 $script_pid 2> /dev/null
     if [ $? -eq 0 ]; then
         echo OK > "$chkrestat" && rm -f "$chklock"
     else
@@ -279,7 +270,7 @@ restart () {
     else
         myecho "Restart status file $chkrestat not found. Is this a restart failure?"
         sleep 5
-        ps -p $script_pid > /dev/null
+        kill -0 $script_pid 2> /dev/null
         if [ $? -eq 0 ]
         then
             myecho "Restart status check: Process running."
@@ -366,7 +357,7 @@ firststart () {
     myecho "PID of running script: $script_pid"
     # check status of process shortly after launch
     sleep 5
-    ps -p $script_pid > /dev/null
+    kill -0 $script_pid 2> /dev/null
     if [ $? -eq 0 ]; then
     	echo $script_pid > "$CSUB_MASTER_PID_FILE"
     else
@@ -388,7 +379,7 @@ chkptsleep () {
       # reverse 1s for actual check
       sleep $(($chkslint-1))
       # exit sleep loop as soon as process is no longer there
-      ps -p $script_pid > /dev/null
+      kill -0 $script_pid 2> /dev/null
       if [ $? -ne 0 ]; then
         return
       fi
@@ -405,15 +396,15 @@ makechkpt () {
     chkfile_curTime=`timestamp_latest_checkpoint`
     myecho "chkfile_lastTime: $chkfile_lastTime; chkfile_curTime: $chkfile_curTime"
     if [ "$chkfile_curTime" -gt "$chkfile_lastTime" ]; then
-    	myecho "Recent checkpoint(s) found (timestamp: `date -d @$chkfile_curTime`, time now: `date`):"
-    	ps -p $script_pid > /dev/null
-    	if [ $? -eq 0 ]; then
-    		echo "Process (pid: $script_pid) still running, killing it..."
-    		kill $script_pid
-    	fi
-    	myecho "Using checkpoint found, not checkpointing again."
+        myecho "Recent checkpoint(s) found (timestamp: `date -d @$chkfile_curTime`, time now: `date`):"
+        kill -0 $script_pid 2> /dev/null
+        if [ $? -eq 0 ]; then
+            echo "Process (pid: $script_pid) still running, killing it..."
+            kill $script_pid
+        fi
+        myecho "Using checkpoint found, not checkpointing again."
     else
-    	myecho "No recent checkpoint found, so checkpointing..."
+        myecho "No recent checkpoint found, so checkpointing..."
         coord_port=$(cat "$chkdir/$PORTFILE")
         myecho "DMTCP coordinator port: $coord_port"
         # checkpoint & wait until checkpointing is done
@@ -464,15 +455,13 @@ myecho
 myecho "BEGIN base $%(CSUB_JOBID)s `date`"
 myecho
 
-# check whether DMTCP commands are available
-for cmd in $DMTCP_COMMAND $DMTCP_LAUNCH $DMTCP_RESTART; do
-    which $cmd > /dev/null
-    if [ $? -ne 0 ]; then
-        myecho "ERROR: DMTCP command '$cmd' not found, aborting job"
-        endjob
-        exit 30
-    fi
-done
+# check whether DMTCP is available
+which $DMTCP_COMMAND > /dev/null
+if [ $? -ne 0 ]; then
+    myecho "ERROR: DMTCP is not available, aborting job"
+    endjob
+    exit 30
+fi
 
 cd "$localdir"
 if [ $? -gt 0 ]
@@ -494,7 +483,7 @@ else
     restart
 fi
 
-ps -p $script_pid > /dev/null
+kill -0 $script_pid 2> /dev/null
 if [ $? -ne 0 ]
 then
     myecho "Process not running before sleep."
@@ -503,7 +492,7 @@ fi
 chkptsleep
 
 # check whether job is still running or finished
-ps -p $script_pid > /dev/null
+kill -0 $script_pid 2> /dev/null
 if [ $? -eq 0 ]; then
   makechkpt
   resubmit # exits
