@@ -107,6 +107,7 @@ chkid="$chkdir/chkpt.count"
 
 # set environment variable with location of checkpoint file
 # can be used by user program to checkpoint itself
+export CSUB_CHECKPOINT_DIR="$chkdir"
 export CSUB_CHECKPOINT_FILE=`ls $chkdir/*.dmtcp 2> /dev/null`
 # initialize env variable for PID of process to be checkpointed
 export CSUB_MASTER_PID_FILE="$chkdir/csub_master_pid"

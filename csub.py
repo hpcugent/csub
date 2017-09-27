@@ -537,10 +537,16 @@ then
 fi
 
 # create checkpoint and kill master and its children (which includes this script)
-cr_checkpoint --kill $pid -f $CSUB_CHECKPOINT_FILE
+coord_port=$(cat $CSUB_CHECKPOINT_DIR/portfile)
+echo "DMTCP coordinator port: $coord_port"
+dmtcp_command --port $coord_port --bcheckpoint
 exit_code=$?
-if [ $exit_code -ne 0 ]
-then
+if [ $exit_code -eq 0 ]; then
+    echo "Checkpoint seems to have worked, stopping job"
+    find $CSUB_CHECKPOINT_DIR -name '*.dmtcp'
+    dmtcp_command --port $coord_port --status
+    dmtcp_command --port $coord_port --quit
+else
     echo "ERROR! Checkpointing master (pid: `cat $CSUB_MASTER_PID_FILE`) failed (exit code: $exit_code)."
     ls -l $CSUB_CHECKPOINT_FILE
     rm -f $CSUB_KILL_ACK_FILE
