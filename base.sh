@@ -245,6 +245,8 @@ restart () {
     lockfile "$chklock"
     # using --new-coordinator doesn't seem to work, so start DMTCP coordinator ourselves as daemon and use that
     $DMTCP_COORDINATOR --daemon --coord-logfile "$chkdir/coord.log.$$" --coord-port 0 --port-file "$chkdir/$PORTFILE" --ckptdir $chkdir --exit-on-last --interval 0
+    # give DMTCP coordinator some time to start...
+    sleep 3
     coord_port=$(cat "$chkdir/$PORTFILE")
     myecho "DMTCP coordinator port: $coord_port"
     $DMTCP_RESTART --coord-port $coord_port `find $chkdir -name '*.dmtcp'` &
