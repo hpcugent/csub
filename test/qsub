@@ -43,7 +43,6 @@ export PBS_JOBID=$RANDOM
 echo $PBS_JOBID
 
 lock=/tmp/$USER/fake_qsub.lock
-rm -f $lock
 lockfile $lock
 rm $lock
 

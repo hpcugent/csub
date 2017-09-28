@@ -48,7 +48,6 @@ unset %(CSUB_SERVER)s
 jobname=${%(CSUB_JOBNAME)s}
 ## jobname_stripped is set in BASEHEADER
 scriptname="${jobname_stripped}.sh"
-script_pid=0
 localdir="${%(CSUB_SCRATCH_NODE)s}/$jobname"
 
 myecho () {
@@ -403,7 +402,7 @@ makechkpt () {
         kill -0 $script_pid 2> /dev/null
         if [ $? -eq 0 ]; then
             echo "Process (pid: $script_pid) still running, killing it..."
-            kill $script_pid
+            kill -9 $script_pid
         fi
         myecho "Using checkpoint found, not checkpointing again."
     else
