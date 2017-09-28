@@ -1,12 +1,13 @@
 Summary: csub wrapper for qsub and BLCR
 Name: csub
-Version: 1.0
+Version: 2.0
 Release: 1
 BuildArch: noarch
 License: GPL
 Group: Applications/System
 Source: %{name}-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
+Requires: dmtcp
 %description
 This repository contains code to generate a csub script, this is wrapper script around qsub and blcr,
 which will take a command, and automatically checkpoint it. If a job is about to run out of it's wall

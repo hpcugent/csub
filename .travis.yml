@@ -1,0 +1,22 @@
+language: python
+python: 2.6
+addons:
+  apt:
+    packages:
+      # 'lockfile' command is provided by procmail package (yes...)
+      - procmail
+env:
+    - DMTCP_VERSION=2.5.1
+before_install:
+    # download & build DMTCP
+    - wget https://github.com/dmtcp/dmtcp/archive/${DMTCP_VERSION}.tar.gz
+    - mkdir -p $PWD/DMTCP-${DMTCP_VERSION}
+    - tar xfz ${DMTCP_VERSION}.tar.gz -C $PWD/DMTCP-${DMTCP_VERSION} --strip-components 1
+    - cd DMTCP-${DMTCP_VERSION} && ./configure --prefix $TRAVIS_BUILD_DIR && make && make check && make install && cd -
+install:
+    # make sure DMTCP command and fake 'qsub' command is available
+    - export PATH=$TRAVIS_BUILD_DIR/bin:$PWD/test:$PATH
+    # generate 'csub' script
+    - ./makecsub.py
+script:
+    - $PWD/test/test.sh
