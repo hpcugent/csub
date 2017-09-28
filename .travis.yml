@@ -12,26 +12,11 @@ before_install:
     - wget https://github.com/dmtcp/dmtcp/archive/${DMTCP_VERSION}.tar.gz
     - mkdir -p $PWD/DMTCP-${DMTCP_VERSION}
     - tar xfz ${DMTCP_VERSION}.tar.gz -C $PWD/DMTCP-${DMTCP_VERSION} --strip-components 1
-    - cd DMTCP-${DMTCP_VERSION} && ./configure --prefix $TRAVIS_BUILD_DIR && make && make install && cd -
+    - cd DMTCP-${DMTCP_VERSION} && ./configure --prefix $TRAVIS_BUILD_DIR && make && make check && make install && cd -
 install:
     # make sure DMTCP command and fake 'qsub' command is available
     - export PATH=$TRAVIS_BUILD_DIR/bin:$PWD/test:$PATH
     # generate 'csub' script
     - ./makecsub.py
 script:
-    - which lockfile || ls -l /usr/bin || echo $PATH
-    - export VSC_SCRATCH=/tmp/$USER; export VSC_SCRATCH_NODE=/tmp/$USER/local
-    - ./csub --shared -s $PWD/test/count.sh --job_time=0:0:20 --no_cleanup_chkpt
-    # wait until job.complete file is created, or fail & dump debug info
-    # count.sh needs 150s to complete, csub only checks once a minute => 2 checkpoints expected
-    - (timeout 240 bash -c -- "while [ ! -f /tmp/$USER/chkpt/*/job.complete ]; do date; sleep 10; done") || (find /tmp/$USER/chkpt && echo "stdout" && cat /tmp/$USER/chkpt/*/count.sh.*.base.out && cat /tmp/$USER/chkpt/*/count.sh.*.[0-9A-Za-z][0-9A-Za-z].out && echo "stderr" && cat /tmp/$USER/chkpt/*/count.sh.*.base.err && exit 1)
-    - ls -l /tmp/$USER/chkpt/*/job.normal
-    - ls -l /tmp/$USER/chkpt/*/job.complete
-    - start_count=$(cat /tmp/$USER/chkpt/*/checkpoint/start.count); test ${start_count:-1} -eq 0 || (echo $start_count && exit 1)
-    - chkpt_count=$(cat /tmp/$USER/chkpt/*/checkpoint/chkpt.count); test ${chkpt_count:-1} -eq 2 || (echo $chkpt_count && exit 1)
-    # counts from 0 to 149 should be there in the job output file
-    - test $(cat /tmp/$USER/chkpt/*/count.sh.*.[0-9A-Za-z][0-9A-Za-z].out | wc -l) -eq 150
-    - for n in `seq 0 149`; do grep "^$n " /tmp/$USER/chkpt/*/count.sh.*.[0-9A-Za-z][0-9A-Za-z].out; done
-    - grep '^149 ' /tmp/$USER/chkpt/*/count.sh.*.[0-9A-Za-z][0-9A-Za-z].out
-    # stderr output file should be empty
-    - ls -s /tmp/$USER/chkpt/*/count.sh.*.[0-9A-Za-z][0-9A-Za-z].err | grep '^0 '
+    - $PWD/test/test.sh
