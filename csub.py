@@ -60,7 +60,6 @@ csub_vars_map = {
     'CSUB_KILL_MODE': 'kill',
     'CSUB_O_HOST': 'PBS_O_HOST',
     'CSUB_ORG': 'VSC',
-    'CSUB_QUEUE': 'PBS_QUEUE',
     'CSUB_SCHEDULER': 'PBS',
     'CSUB_SCRATCH_NODE': 'VSC_SCRATCH_NODE',
     'CSUB_SCRATCH': 'VSC_SCRATCH',
