@@ -1,6 +1,6 @@
 Summary: csub wrapper for qsub and BLCR
 Name: csub
-Version: 2.0
+Version: 2.1
 Release: 1
 BuildArch: noarch
 License: GPL
