@@ -278,17 +278,23 @@ def gen_base_header(localmap, script):
 
         localmap.update({'wall_time_str': gen_wall_time_str(localmap['wall_time'])})
 
-        txt = """#!/bin/bash
-#PBS -l walltime=%(wall_time_str)s
-%(queue_spec)s
-#PBS -N %(name)s
-#PBS -o %(chkptdirbase)s/%(name)s.base.out
-#PBS -e %(chkptdirbase)s/%(name)s.base.err
-%(epilogue_header_spec)s
-%(prologue_header_spec)s
-%(l_specs)s
-%(queue_spec)s
-%(vmem_spec)s
+        pbs_header_lines = [
+            '#PBS -l walltime=%(wall_time_str)s',
+            '%(queue_spec)s',
+            '#PBS -N %(name)s',
+            '#PBS -o %(chkptdirbase)s/%(name)s.base.out',
+            '#PBS -e %(chkptdirbase)s/%(name)s.base.err',
+            '%(epilogue_header_spec)s',
+            '%(prologue_header_spec)s',
+            '%(l_specs)s',
+            '%(queue_spec)s',
+            '%(vmem_spec)s',
+        ]
+
+        # avoid add empty lines in #PBS header!
+        pbs_header = '\n'.join(l for l in [x % localmap for x in pbs_header_lines] if l)
+
+        txt = "#!/bin/bash\n" + pbs_header + """
 
 # job name without array id (if any)
 jobname_stripped=%(name)s
