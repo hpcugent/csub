@@ -169,13 +169,13 @@ resubmit () {
     myexit=0
     ## resubmit this job (-N is required for array jobs!)
     ## the rest of this job should finish before all else
-    out=`qsub -N $jobname -q $%(CSUB_QUEUE)s -o $chkbaseout -e $chkbaseerr -W depend=afterok:$%(CSUB_JOBID)s "$chkdir/base"`
+    out=`qsub -W depend=afterok:$%(CSUB_JOBID)s "$chkdir/base"`
     if [ $? -gt 0 ]
     then
         myecho "Job resubmit failed."
         myecho "Job resubmit output): $out"
         sleep 5
-        out=`qsub -N $jobname -q $%(CSUB_QUEUE)s -o $chkbaseout -e $chkbaseerr -W depend=afterok:$%(CSUB_JOBID)s "$chkdir/base"`
+        out=`qsub -N $jobname -W depend=afterok:$%(CSUB_JOBID)s "$chkdir/base"`
         if [ $? -gt 0 ]
         then
             myecho "Job resubmit failed again."
